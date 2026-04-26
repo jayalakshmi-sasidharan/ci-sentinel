@@ -1,0 +1,49 @@
+name: CI Sentinel Backend
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: maven
+
+      - name: Build with Maven
+        run: mvn clean compile
+        working-directory: backend
+
+      - name: Run tests
+        run: mvn test
+        working-directory: backend
+
+      - name: Package application
+        run: mvn package -DskipTests
+        working-directory: backend
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: test-results
+          path: backend/target/surefire-reports/*.xml
+
+      - name: Upload JAR artifact
+        uses: actions/upload-artifact@v4
+        if: success()
+        with:
+          name: backend-jar
+          path: backend/target/*.jar
