@@ -1,74 +1,90 @@
 package com.cisentinel.backend.service;
 
 import com.cisentinel.backend.model.PipelineRun;
+import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestClient;
-
+import org.springframework.web.client.RestTemplate;
+import org.springframework.http.*;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 public class GitHubService {
 
-    private final RestClient restClient;
+    private final String token;
+    private final String owner;
+    private final String repo;
+    private final RestTemplate restTemplate;
+    private final ObjectMapper objectMapper;
 
-    @Value("${github.api.owner}")
-    private String owner;
-
-    @Value("${github.api.repo}")
-    private String repo;
-
-    public GitHubService(RestClient.Builder restClientBuilder, 
-                         @Value("${github.api.base-url}") String baseUrl,
-                         @Value("${github.api.token}") String token) {
-        
-        // Configure the HTTP client with base URLs and Auth headers required by GitHub
-        this.restClient = restClientBuilder
-                .baseUrl(baseUrl)
-                .defaultHeader(HttpHeaders.ACCEPT, "application/vnd.github+json")
-                .defaultHeader(HttpHeaders.AUTHORIZATION, token.isEmpty() ? "" : "Bearer " + token)
-                .build();
+    public GitHubService(
+        @Value("${github.token}") String token,
+        @Value("${github.owner}") String owner,
+        @Value("${github.repo}") String repo
+    ) {
+        this.token = token;
+        this.owner = owner;
+        this.repo = repo;
+        this.restTemplate = new RestTemplate();
+        this.objectMapper = new ObjectMapper();
     }
 
-    @SuppressWarnings("unchecked")
-    public List<PipelineRun> getLiveWorkflowRuns() {
-        // Target endpoint: /repos/{owner}/{repo}/actions/runs
-        Map<String, Object> response = restClient.get()
-                .uri("/repos/{owner}/{repo}/actions/runs?per_page=10", owner, repo)
-                .retrieve()
-                .body(Map.class);
+    public List<PipelineRun> getPipelineRuns() {
+        String url = String.format(
+            "https://api.github.com/repos/%s/%s/actions/runs", 
+            owner, repo
+        );
 
-        if (response == null || !response.containsKey("workflow_runs")) {
-            return List.of();
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + token);
+        headers.set("Accept", "application/vnd.github+json");
+        headers.set("X-GitHub-Api-Version", "2022-11-28");
+
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                url, HttpMethod.GET, entity, String.class
+            );
+
+            JsonNode root = objectMapper.readTree(response.getBody());
+            JsonNode runs = root.get("workflow_runs");
+
+            List<PipelineRun> result = new ArrayList<>();
+
+            for (JsonNode run : runs) {
+                long duration = 0;
+                if (!run.get("created_at").isNull() && !run.get("updated_at").isNull()) {
+                    // calculate duration in seconds between created and updated
+                    String createdAt = run.get("created_at").asText();
+                    String updatedAt = run.get("updated_at").asText();
+                    duration = java.time.Duration.between(
+                        java.time.Instant.parse(createdAt),
+                        java.time.Instant.parse(updatedAt)
+                    ).getSeconds();
+                }
+
+                result.add(PipelineRun.builder()
+                    .id(run.get("id").asText())
+                    .name(run.get("name").asText())
+                    .status(run.get("status").asText())
+                    .conclusion(run.get("conclusion").isNull() ? "in_progress" : run.get("conclusion").asText())
+                    .branch(run.get("head_branch").asText())
+                    .commitMessage(run.get("head_commit").get("message").asText())
+                    .triggeredBy(run.get("triggering_actor").get("login").asText())
+                    .createdAt(run.get("created_at").asText())
+                    .updatedAt(run.get("updated_at").asText())
+                    .durationSeconds(duration)
+                    .build()
+                );
+            }
+            return result;
+
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to fetch pipeline runs from GitHub: " + e.getMessage());
         }
-
-        List<Map<String, Object>> runs = (List<Map<String, Object>>) response.get("workflow_runs");
-
-        // Map GitHub's native JSON structure directly into our SRE Dashboard model
-        return runs.stream().map(run -> {
-            Map<String, Object> headCommit = (Map<String, Object>) run.get("head_commit");
-            Map<String, Object> actor = (Map<String, Object>) run.get("actor");
-            
-            // Calculate duration if timestamps are present
-            String createdAt = (String) run.get("created_at");
-            String updatedAt = (String) run.get("updated_at");
-            long duration = 0; // Simplified placeholder for timestamp delta logic
-            
-            return PipelineRun.builder()
-                    .id(String.valueOf(run.get("id")))
-                    .name((String) run.get("name"))
-                    .status((String) run.get("status"))
-                    .conclusion((String) run.get("conclusion"))
-                    .branch((String) run.get("head_branch"))
-                    .commitMessage(headCommit != null ? (String) headCommit.get("message") : "No commit message")
-                    .triggeredBy(actor != null ? (String) actor.get("login") : "unknown")
-                    .createdAt(createdAt)
-                    .updatedAt(updatedAt)
-                    .durationSeconds((int) duration)
-                    .build();
-        }).collect(Collectors.toList());
     }
 }

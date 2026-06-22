@@ -32,7 +32,7 @@ public class PipelineControllerTest {
 
     @Test
     void getPipelinesReturnsList() throws Exception {
-        Mockito.when(gitHubService.getLiveWorkflowRuns()).thenReturn(List.of(
+        Mockito.when(gitHubService.getPipelineRuns()).thenReturn(List.of(
                 PipelineRun.builder()
                         .id("1")
                         .name("Build and Test")
@@ -82,5 +82,23 @@ public class PipelineControllerTest {
                 .andExpect(jsonPath("$[1].durationSeconds").value(600));
     }
 
-    
+    @Test
+        void getPipelinesReturnsMultipleEntries() throws Exception {
+        Mockito.when(gitHubService.getPipelineRuns()).thenReturn(List.of(
+                PipelineRun.builder()
+                .id("1").name("Build and Test").status("completed")
+                .conclusion("success").branch("main").commitMessage("Initial commit")
+                .triggeredBy("bob").createdAt("2024-06-01T12:00:00Z")
+                .updatedAt("2024-06-01T12:10:00Z").durationSeconds(600).build(),
+                PipelineRun.builder()
+                .id("2").name("Deploy to Staging").status("completed")
+                .conclusion("failure").branch("main").commitMessage("Add new feature")
+                .triggeredBy("alice").createdAt("2024-06-01T12:15:00Z")
+                .updatedAt("2024-06-01T12:25:00Z").durationSeconds(600).build()
+        ));
+        mockMvc.perform(get("/api/pipelines"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray())
+                .andExpect(jsonPath("$.length()").value(2));
+        }
 }

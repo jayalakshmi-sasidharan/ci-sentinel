@@ -1,10 +1,8 @@
 package com.cisentinel.backend.controller;
 
-import org.springframework.web.bind.annotation.*;
-
 import com.cisentinel.backend.model.PipelineRun;
 import com.cisentinel.backend.service.GitHubService;
-
+import org.springframework.web.bind.annotation.*;
 import java.util.List;
 
 @RestController
@@ -16,7 +14,7 @@ public class PipelineController {
     public PipelineController(GitHubService gitHubService) {
         this.gitHubService = gitHubService;
     }
-    
+
     @GetMapping("/health")
     public String health() {
         return "CI Sentinel backend is running";
@@ -24,6 +22,6 @@ public class PipelineController {
 
     @GetMapping
     public List<PipelineRun> getPipelines() {
-        return gitHubService.getLiveWorkflowRuns();
+        return gitHubService.getPipelineRuns();
     }
 }
