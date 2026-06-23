@@ -9,7 +9,11 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.boot.test.mock.mockito.MockBean;
+
+import com.cisentinel.backend.service.AIAnalysisService;
 import com.cisentinel.backend.service.GitHubService;
+import com.cisentinel.backend.service.LogFetcherService;
+
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
@@ -22,6 +26,12 @@ public class PipelineControllerTest {
 
     @MockBean
     private GitHubService gitHubService;
+    
+    @MockBean
+    private AIAnalysisService aiAnalysisService;
+
+    @MockBean
+    private LogFetcherService logFetcherService;
 
     @Test
     void healthEndPointReturnsOk() throws Exception {
