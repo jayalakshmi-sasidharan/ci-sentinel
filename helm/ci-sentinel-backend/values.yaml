@@ -1,0 +1,14 @@
+replicaCount: 1
+
+image:
+  repository: jsasid/ci-sentinel-backend
+  tag: latest
+  pullPolicy: Always
+
+service:
+  type: ClusterIP
+  port: 8080
+
+env:
+  githubOwner: jayalakshmi-sasidharan
+  githubRepo: ci-sentinel
