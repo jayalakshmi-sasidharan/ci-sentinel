@@ -24,47 +24,46 @@ public class LogFetcherService {
         this.restTemplate = new RestTemplate();
     }
 
-public String fetchLogs(String runId) {
-    try {
-        String url = String.format(
-            "https://api.github.com/repos/%s/%s/actions/runs/%s/logs",
-            owner, repo, runId
-        );
+    public String fetchLogs(String runId) {
+        try {
+            String url = String.format(
+                "https://api.github.com/repos/%s/%s/actions/runs/%s/logs",
+                owner, repo, runId
+            );
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "Bearer " + token);
-        headers.set("Accept", "application/vnd.github+json");
-        headers.set("X-GitHub-Api-Version", "2022-11-28");
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("Authorization", "Bearer " + token);
+            headers.set("Accept", "application/vnd.github+json");
+            headers.set("X-GitHub-Api-Version", "2022-11-28");
 
-        HttpEntity<String> entity = new HttpEntity<>(headers);
+            HttpEntity<String> entity = new HttpEntity<>(headers);
 
-        ResponseEntity<byte[]> response = restTemplate.exchange(
-            url, HttpMethod.GET, entity, byte[].class
-        );
+            ResponseEntity<byte[]> response = restTemplate.exchange(
+                url, HttpMethod.GET, entity, byte[].class
+            );
 
-        if (response.getBody() == null) return "No logs available";
+            if (response.getBody() == null) return "No logs available";
 
-        // GitHub returns logs as a zip file — decompress it
-        StringBuilder logs = new StringBuilder();
-        try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(
-                new java.io.ByteArrayInputStream(response.getBody()))) {
-            
-            java.util.zip.ZipEntry entry;
-            while ((entry = zis.getNextEntry()) != null) {
-                // Only read .txt log files
-                if (entry.getName().endsWith(".txt")) {
-                    String content = new String(zis.readAllBytes(), java.nio.charset.StandardCharsets.UTF_8);
-                    logs.append("=== ").append(entry.getName()).append(" ===\n");
-                    logs.append(content).append("\n");
+            StringBuilder logs = new StringBuilder();
+            try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(
+                    new java.io.ByteArrayInputStream(response.getBody()))) {
+
+                java.util.zip.ZipEntry entry;
+                while ((entry = zis.getNextEntry()) != null) {
+                    if (entry.getName().endsWith(".txt")) {
+                        String content = new String(zis.readAllBytes(), 
+                            java.nio.charset.StandardCharsets.UTF_8);
+                        logs.append("=== ").append(entry.getName()).append(" ===\n");
+                        logs.append(content).append("\n");
+                    }
+                    zis.closeEntry();
                 }
-                zis.closeEntry();
             }
+
+            return logs.length() > 0 ? logs.toString() : "No readable logs found in zip";
+
+        } catch (Exception e) {
+            return "Failed to fetch logs: " + e.getMessage();
         }
-
-        return logs.length() > 0 ? logs.toString() : "No readable logs found in zip";
-
-    } catch (Exception e) {
-        return "Failed to fetch logs: " + e.getMessage();
     }
-}
 }
