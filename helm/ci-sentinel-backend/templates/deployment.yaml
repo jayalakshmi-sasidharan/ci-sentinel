@@ -30,6 +30,16 @@ spec:
               value: {{ .Values.env.githubOwner }}
             - name: GITHUB_REPO
               value: {{ .Values.env.githubRepo }}
+            - name: ANTHROPIC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secrets
+                  key: anthropic-api-key
+            - name: SLACK_WEBHOOK_URL
+              valueFrom:
+                secretKeyRef:
+                  name: {{ .Release.Name }}-secrets
+                  key: slack-webhook-url
           readinessProbe:
             httpGet:
               path: /actuator/health
