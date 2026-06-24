@@ -38,11 +38,29 @@ public class LogFetcherService {
 
             HttpEntity<String> entity = new HttpEntity<>(headers);
 
-            ResponseEntity<String> response = restTemplate.exchange(
-                url, HttpMethod.GET, entity, String.class
+            ResponseEntity<byte[]> response = restTemplate.exchange(
+                url, HttpMethod.GET, entity, byte[].class
             );
 
-            return response.getBody() != null ? response.getBody() : "No logs available";
+            if (response.getBody() == null) return "No logs available";
+
+            StringBuilder logs = new StringBuilder();
+            try (java.util.zip.ZipInputStream zis = new java.util.zip.ZipInputStream(
+                    new java.io.ByteArrayInputStream(response.getBody()))) {
+
+                java.util.zip.ZipEntry entry;
+                while ((entry = zis.getNextEntry()) != null) {
+                    if (entry.getName().endsWith(".txt")) {
+                        String content = new String(zis.readAllBytes(), 
+                            java.nio.charset.StandardCharsets.UTF_8);
+                        logs.append("=== ").append(entry.getName()).append(" ===\n");
+                        logs.append(content).append("\n");
+                    }
+                    zis.closeEntry();
+                }
+            }
+
+            return logs.length() > 0 ? logs.toString() : "No readable logs found in zip";
 
         } catch (Exception e) {
             return "Failed to fetch logs: " + e.getMessage();

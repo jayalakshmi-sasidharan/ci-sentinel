@@ -1,7 +1,6 @@
 package com.cisentinel.backend.service;
 
 import com.cisentinel.backend.model.PipelineRun;
-import io.github.cdimascio.dotenv.Dotenv;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
